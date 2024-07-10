@@ -171,6 +171,7 @@ class SampledMoleculesSm(SampledMolecules):
 
     def getChiralMetricsAsDF(self):
         return pd.Series([
+            self.chiral.sum(),
             (  (self.chiral & ~self._maskValid) | (self.chiral & self._maskValid & (self.nStereoSampled!=self.nStereoGen))).sum(),
             (  self.chiral & self._maskValid & (self.nStereoSampled==self.nStereoGen)).sum(),
             (  self.chiral & self._maskUnique & (self.nStereoSampled==self.nStereoGen)).sum(),
@@ -201,6 +202,7 @@ class SampledMoleculesFragSm(SampledMolecules):
 
     def getChiralMetricsAsDF(self):
         return pd.Series([
+            self.chiral.sum(),
             (~self._maskValid & self.chiral ).sum(),
             (self._maskValid & self.chiral ).sum(),
             (self._maskUnique & self.chiral ).sum(),
@@ -279,7 +281,7 @@ class Evaluator():
     def getChiralResultsGens(self):
         results = self.gens.copy()
 
-        results[['invalid','valid','unique','novel']]=results['sampled'].apply(lambda x: x.getChiralMetricsAsDF())
+        results[['chirals','invalid','valid','unique','novel']]=results['sampled'].apply(lambda x: x.getChiralMetricsAsDF())
 
         results.drop(columns='sampled', inplace=True)
         return results.sort_values(['amount','fold','epoch'])
