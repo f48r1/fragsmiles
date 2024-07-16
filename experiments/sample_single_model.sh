@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ARGS=$(getopt -o '' --longoptions hl:,hu:,bs:,lr:,es:,epoch:,aug:,notation:,cuda:,fold:,gamma:,samples:,temp:,batch:,seed:,dataset:,onlyNovels -- "$@")
+ARGS=$(getopt -o '' --longoptions hl:,hu:,bs:,lr:,es:,epoch:,aug:,notation:,device:,fold:,gamma:,samples:,temp:,batch:,seed:,dataset:,onlyNovels -- "$@")
 
 if [[ $? -ne 0 ]]; then
     exit 1;
@@ -17,7 +17,7 @@ gamma=1.0
 
 epoch=
 aug=
-cuda=cpu
+device=cpu
 fold=
 seed=0
 onlyNovels=
@@ -36,9 +36,9 @@ while true; do
     --lr) lr="$2"; shift 2 ;;
     --epoch) epoch="$2"; shift 2 ;;
     --aug) aug="Aug${2}"; shift 2 ;;
-    --dataset) dataset="$2"; shift 2 ;;
     --notation) notation="$2"; shift 2 ;;
-    --cuda) cuda="cuda:$2"; shift 2 ;;
+    --dataset) dataset="$2"; shift 2 ;;
+    --device) device="$2"; shift 2 ;;
     --fold) fold="$2"; shift 2 ;;
     --gamma) gamma="$2"; shift 2 ;;
     --samples) samples="$2"; shift 2 ;;
@@ -64,16 +64,16 @@ else
 fi
 
 case $notation in
-fragsmiles) dir="grisoni${aug}_fragSMILES-RNN"; ;;
-selfies) dir="grisoni${aug}_SELFIES-RNN"; ;;
-smiles) dir="grisoni${aug}_SMILES-RNN"; ;;
+fragsmiles) dir="${dataset}${aug}_fragSMILES-RNN"; ;;
+selfies) dir="${dataset}${aug}_SELFIES-RNN"; ;;
+smiles) dir="${dataset}${aug}_SMILES-RNN"; ;;
 esac
 
 if [[ "${fold}" ]]; then
-    suffix="_${fold}"
+    foldStr="_${fold}"
 fi
 
-prefixes=${model}${suffix}
+prefixes=${model}${foldStr}
 
 if [[ "${epoch}" ]]; then
     epochPad=$(printf "%03d" $epoch)
@@ -91,7 +91,12 @@ fi
 
 echo $notation started ${dir}/${experiment}/${prefixes}_generated${samples}${novelsStr}${epoch}${seedStr}_T${T}.csv $(date "+%Y/%m/%d %H:%M:%S")
 
-cd $dir
-python3.11 ../scripts/sample.py ${model} --device ${cuda} --model_load ./${experiment}/${prefixes}_model${epochPad}.pt --gen_save ./${experiment}/${prefixes}_generated${samples}${novelsStr}${epoch}${seedStr}_T${T}.csv --n_samples ${samples} --temp ${T} --max_len ${len} --n_batch ${batch} --config_load ./${experiment}/${prefixes}_config.pt --vocab_load ./${experiment}/${prefixes}_vocab.pt --notation $notation --seed ${seed} ${onlyNovels}
+cd ${dir}
+
+## Here, if required, you can set loading of your python/conda environment
+# source ~/.venv/bin/activate
+# conda activate venv
+
+python ../scripts/sample.py ${model} --device ${device} --model_load ./${experiment}/${prefixes}_model${epochPad}.pt --gen_save ./${experiment}/${prefixes}_generated${samples}${novelsStr}${epoch}${seedStr}_T${T}.csv --n_samples ${samples} --temp ${T} --max_len ${len} --n_batch ${batch} --config_load ./${experiment}/${prefixes}_config.pt --vocab_load ./${experiment}/${prefixes}_vocab.pt --notation $notation --seed ${seed} ${onlyNovels}
 
 echo $notation finished ${dir}/${experiment}/${prefixes}_generated${samples}${novelsStr}${epoch}${seedStr}_T${T}.csv $(date "+%Y/%m/%d %H:%M:%S")

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ARGS=$(getopt -o '' --longoptions hl:,hu:,bs:,lr:,es:,epoch:,aug:,notation:,njobs:,fold:,gamma:,samples:,temp:,seed:,dataset:,onlyNovels,cuda: -- "$@")
+ARGS=$(getopt -o '' --longoptions hl:,hu:,bs:,lr:,es:,epoch:,aug:,notation:,njobs:,fold:,gamma:,samples:,temp:,seed:,dataset:,onlyNovels,device: -- "$@")
 
 if [[ $? -ne 0 ]]; then
     exit 1;
@@ -17,7 +17,7 @@ gamma=1.0
 
 epoch=
 aug=
-cuda=cpu
+device=cpu
 fold=
 seed=0
 onlyNovels=
@@ -25,9 +25,9 @@ njobs=1
 
 samples=6000
 T=1.0
-batch=1000
+batch=512
 dataset=grisoni
-    
+
 while true; do
   case "$1" in
     --hl ) hl="$2"; shift 2 ;;
@@ -45,7 +45,7 @@ while true; do
     --batch) batch="$2"; shift 2 ;;
     --seed) seed="$2"; shift 2 ;;
     --dataset) dataset="$2"; shift 2 ;;
-    --cuda) cuda="cuda:$2"; shift 2 ;;
+    --device) device="$2"; shift 2 ;;
     --njobs) njobs="$2"; shift 2 ;;
     --onlyNovels) onlyNovels="novels"; shift ;;
     -- ) shift; break ;;
@@ -73,10 +73,10 @@ smiles) dir="${dataset}${aug}_SMILES-RNN"; ;;
 esac
 
 if [[ "${fold}" ]]; then
-    suffix="_${fold}"
+    foldStr="_${fold}"
 fi
 
-prefixes=${model}${suffix}
+prefixes=${model}${foldStr}
 
 if [[ "${epoch}" ]]; then
     epochPad=$(printf "%03d" $epoch)
@@ -88,16 +88,27 @@ if [ $seed != '0' ]; then
     seedStr=_seed$seed
 fi
 
-#Non metto mai augmented per il train perche' tanto e' quello x1 che devo caricare in ogni caso ...
-train=../data/${dataset}_train${suffix}.tar.xz
+#Augmented dataset is not involved for the evualuation phase because we need only canonical sampled smiles
+train="../data/${dataset}_train${foldStr}.tar.xz"
+test="../data/${dataset}_test${foldStr}.tar.xz"
 
-cd ~/DeNovo/experiments/${dir}
+if [ $dataset == 'moses' ]; then
+    #'--ptest_path ../data/moses_train_stats.npz'
+    # ptestStr=
+    # testStr=
+    testStr="--test_path ${test}"
+else
+    testStr="--test_path ${train}"
+fi
+
+cd ${dir}
 
 echo $notation started $dir/${experiment}/${prefixes}_generated${samples}${onlyNovels}${epoch}${seedStr}_T${T}.csv $(date "+%Y/%m/%d %H:%M:%S")
 
-## modificato per il moses ... mettiamo la normale valutaizone basata sul test e test scaffold !!
-# python3.11 ../scripts/eval.py --train_path $train --test_path $train --device ${cuda} --n_jobs $njobs --gen_path ./${experiment}/${prefixes}_generated${samples}${onlyNovels}${epoch}${seedStr}_T${T}.csv
+## Here, if required, you can set loading of your python/conda environment
+# source ~/.venv/bin/activate
+# conda activate venv
 
-python3.11 ../scripts/eval.py --train_path $train --device ${cuda} --n_jobs $njobs --gen_path ./${experiment}/${prefixes}_generated${samples}${onlyNovels}${epoch}${seedStr}_T${T}.csv
+python ../scripts/eval.py --train_path $train ${testStr} ${ptestStr} --device ${device} --n_jobs $njobs --gen_path ./${experiment}/${prefixes}_generated${samples}${onlyNovels}${epoch}${seedStr}_T${T}.csv
 
 echo $notation finished $dir/${experiment}/${prefixes}_generated${samples}${onlyNovels}${epoch}${seedStr}_T${T}.csv $(date "+%Y/%m/%d %H:%M:%S")
