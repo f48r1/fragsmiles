@@ -1,0 +1,11 @@
+matplotlib==3.6.3
+multiprocesspandas==1.1.5
+networkx==3.2.1
+numpy==2.0.0
+one_hot_encoder==1.1
+pandas==2.2.2
+rdkit==2023.9.5
+scikit_learn==1.4.1.post1
+selfies==2.1.1
+torch==2.2.1
+tqdm==4.66.4
