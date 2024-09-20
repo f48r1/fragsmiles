@@ -111,5 +111,7 @@ def main(config):
 
 if __name__ == '__main__':
     parser = get_parser()
-    config = parser.parse_args()
+    config, unk = parser.parse_known_args()
+    if unk:
+        print('unknown arguments:',*unk)
     main(config)

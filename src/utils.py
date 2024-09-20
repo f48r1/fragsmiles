@@ -5,7 +5,7 @@ def add_common_params(parser):
     add_common_arg(parser)
 
     parser.add_argument('--save_frequency',
-                        type=int, default=20,
+                        type=int, default=1,
                         help='How often to save the model')
     parser.add_argument('--dir_experiments',
                         type=str, required=False, default='experiments/',
