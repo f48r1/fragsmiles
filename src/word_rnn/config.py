@@ -33,15 +33,6 @@ def get_parser(parser=None):
     train_arg.add_argument('--n_workers', type=int, default=1,
                            help='Number of workers for DataLoaders')
 
-    #Sampling
-    sample_arg = parser.add_argument_group('Sampling')
-    sample_arg.add_argument("--temp",
-                            type=float, default=1.0,
-                            help="Sampling temperature for softmax")
-    sample_arg.add_argument('--onlyNovels',
-                           default=False, action='store_true',
-                           help='If to generate only novel molecules')
-
     return parser
 
 
