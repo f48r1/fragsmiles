@@ -77,7 +77,7 @@ def main(config):
     model.eval()
         
     data_path= data_path_from_config(config)
-    if 'aug' in model_config.train_load.lower():
+    if 'Aug' in data_path:
         print('loading no augmented list of SMILES training set')
         data_path = re.sub('aug[0-9]+','',data_path, flags=re.IGNORECASE)
 
