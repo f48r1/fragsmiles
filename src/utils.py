@@ -51,9 +51,6 @@ def add_eval_params(parser):
                         help='Number of molecules to calculate uniqueness at.'
                              'Multiple values are possible. Defaults to '
                              '--unique_k 1000')
-    parser.add_argument('--n_jobs',
-                        type=int, default=1,
-                        help='Number of processes to run metrics')
     
 def data_name_from_config(config):
     return config.dataset + ('Aug5' if config.aug == 5 else '')
