@@ -95,7 +95,7 @@ def load_data_from_path(path, notation, fold, return_train=True, return_valid=Tr
                         compression="xz" if 'tar.xz' in path else 'infer')
     
     if not return_train and not return_valid:
-        data[notation].squeeze()
+        return data[notation].squeeze()
 
     if notation == 'fragsmiles' and 'Aug' in path:
         data.dropna(axis=0, inplace=True)
