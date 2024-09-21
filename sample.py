@@ -17,48 +17,25 @@ from src.utils import (add_common_params,
                        setup_name_from_config, 
                        suffix_files_from_config,
                        data_path_from_config,
-                       gen_path_from_config)
+                       gen_name_from_config)
 
 import selfies as sf
 
 ## importing fucntions for converting fragSmiles representations
-from chemicalgof import Sequence2Smiles
+# from chemicalgof import Sequence2Smiles
 
 ## Extra model loaded to employ settings
 from src.word_rnn import WordRNN, WordRNNTrainer, word_rnn_parser
+from src.conversion import (GenSmiles2Smiles,
+                            GenSelfies2Smiles,
+                            GenFragSmiles2Smiles,
+                            GentSmiles2Smiles)
 
 lg = rdkit.RDLogger.logger()
 lg.setLevel(rdkit.RDLogger.CRITICAL)
 
 MODELS = ModelsStorage()
 MODELS.add_model("word_rnn", WordRNN, WordRNNTrainer, word_rnn_parser)
-
-def cleanTokens(arr):
-    toDel=["<bos>","<eos>","<pad>"]
-    arr=np.array(arr)
-    ids=np.where(  np.logical_or.reduce([arr==i for i in toDel]) )
-    return np.delete(arr, ids, axis=None)
-
-def GenSmiles2Smiles(x):
-    x = Chem.MolFromSmiles(*x)
-    if not x:
-        return None
-    elif Chem.DetectChemistryProblems(x):
-        return None
-
-    return Chem.MolToSmiles(x)
-
-def GenSelfies2Smiles(x):
-    try:
-        sm = sf.decoder(*x)
-        return Chem.CanonSmiles(sm)
-    except:
-        return None
-
-def GenFragSmiles2Smiles(x:pd.Series) -> str:
-    lst=x.dropna()
-    lst=cleanTokens(lst)
-    return Sequence2Smiles(lst)
 
 
 def get_parser():
@@ -121,6 +98,8 @@ def main(config):
                 current_smiles = current_samples.apply(GenSmiles2Smiles, axis=1)
             elif config.notation == 'selfies':
                 current_smiles = current_samples.apply(GenSelfies2Smiles, axis=1)
+            elif config.notation == 'tsmiles':
+                current_smiles = current_samples.apply(GentSmiles2Smiles, axis=1)
 
             if config.onlyNovels:
                 maskDupl = current_smiles.duplicated()
@@ -138,7 +117,7 @@ def main(config):
 
     samples.insert(0, "smiles", smiles)
 
-    gen_path = os.path.join ( setup_path, gen_path_from_config(config) + '.csv')
+    gen_path = os.path.join ( setup_path, gen_name_from_config(config) + '.csv')
     samples.to_csv(gen_path, index=False)
 
 if __name__ == '__main__':
