@@ -43,7 +43,7 @@ def get_parser():
     subparsers = parser.add_subparsers(
         title='Models sampler script', description='available models', dest='model')
     for model in MODELS.get_model_names():
-        modelPars = subparsers.add_parser(model)
+        modelPars = MODELS.get_model_train_parser(model)( subparsers.add_parser(model) )
 
         common_arg = modelPars.add_argument_group('Common')
         add_common_params(common_arg)
