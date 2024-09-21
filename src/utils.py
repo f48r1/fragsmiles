@@ -106,9 +106,9 @@ def load_data_from_path(path, notation, fold, return_train=True, return_valid=Tr
     groups = data.groupby(col_fold)
 
     if return_train:
-        train = groups.get_group('train').drop(columns=col_fold).squeeze()
+        train = groups.get_group('train').drop(columns=col_fold).squeeze().reset_index(drop=True)
     if return_valid:
-        valid = groups.get_group('valid').drop(columns=col_fold).squeeze()
+        valid = groups.get_group('valid').drop(columns=col_fold).squeeze().reset_index(drop=True)
 
     if return_train and return_valid:
         return train,valid
