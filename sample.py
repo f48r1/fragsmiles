@@ -71,7 +71,7 @@ def main(config):
     model_vocab = torch.load(f'{suffix_files_path}_vocab.pt')
     model_state = torch.load(f'{suffix_files_path}_model'+'_{0:03d}.pt'.format(config.epoch))
 
-    model = MODELS.get_model_class(model)(model_vocab, model_config)
+    model = MODELS.get_model_class(config.model)(model_vocab, model_config)
     model.load_state_dict(model_state)
     model = model.to(device)
     model.eval()
