@@ -15,40 +15,14 @@ from src.utils import (root_path_from_config,
                        data_path_from_config, 
                        setup_name_from_config, 
                        suffix_files_from_config, 
-                       add_common_params)
+                       add_common_params,
+                       load_data_from_path)
 
 lg = rdkit.RDLogger.logger()
 lg.setLevel(rdkit.RDLogger.CRITICAL)
 
 MODELS = ModelsStorage()
 MODELS.add_model("word_rnn", WordRNN, WordRNNTrainer, word_rnn_parser)
-
-def load_data_from_path(path, config, return_train=True, return_valid=True):
-
-    col_fold = f'fold{config.fold}'
-
-    data = pd.read_csv(path, usecols = [config.notation,col_fold], 
-                        compression="xz" if 'tar.xz' in path else 'infer')
-
-    if config.notation == 'fragsmiles' and config.aug > 1:
-        data.dropna(axis=0, inplace=True)
-    
-    if config.notation in ('fragsmiles','selfies'):
-        data = data.str.split(' ')
-
-    groups = data.groupby(col_fold)
-
-    if return_train:
-        train = groups.get_group('train').drop(columns=col_fold).squeeze()
-    if return_valid:
-        valid = groups.get_group('valid').drop(columns=col_fold).squeeze()
-
-    if return_train and return_valid:
-        return train,valid
-    elif return_train:
-        return train
-    elif return_valid:
-        return valid
 
 
 def get_parser():

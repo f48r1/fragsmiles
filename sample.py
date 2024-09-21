@@ -76,12 +76,18 @@ def main(config):
     model = model.to(device)
     model.eval()
         
-    data_path= data_path_from_config(config, split='train')
+    data_path= data_path_from_config(config)
     if 'aug' in model_config.train_load.lower():
         print('loading no augmented list of SMILES training set')
         data_path = re.sub('aug[0-9]+','',data_path, flags=re.IGNORECASE)
+
+    col_fold = f'fold{config.fold}'
    
-    smilesRef = pd.read_csv(data_path, usecols = ["smiles"], compression="xz", ).squeeze()
+    data = pd.read_csv(data_path, usecols = ['smiles',col_fold], 
+                    compression="xz" if 'tar.xz' in data_path else 'infer')
+
+    groups = data.groupby(col_fold)
+    smilesRef = groups.get_group('train').drop(columns=col_fold).squeeze()
 
     samples = pd.DataFrame()
     smiles = pd.Series()

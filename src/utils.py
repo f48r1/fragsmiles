@@ -1,5 +1,6 @@
 import os
 from moses.script_utils import add_common_arg
+import pandas as pd
 
 def add_common_params(parser):
     add_common_arg(parser)
@@ -88,3 +89,30 @@ def gen_name_from_config(config):
     suffix = suffix_files_from_config(config)
     return suffix + f'_generated{config.n_samples}' + ('novels' if config.onlyNovels else '') +\
           f'_{config.epoch}_T{config.temp}'
+
+def load_data_from_path(path, config, return_train=True, return_valid=True):
+
+    col_fold = f'fold{config.fold}'
+
+    data = pd.read_csv(path, usecols = [config.notation,col_fold], 
+                        compression="xz" if 'tar.xz' in path else 'infer')
+
+    if config.notation == 'fragsmiles' and config.aug > 1:
+        data.dropna(axis=0, inplace=True)
+    
+    if config.notation in ('fragsmiles','selfies'):
+        data = data.str.split(' ')
+
+    groups = data.groupby(col_fold)
+
+    if return_train:
+        train = groups.get_group('train').drop(columns=col_fold).squeeze()
+    if return_valid:
+        valid = groups.get_group('valid').drop(columns=col_fold).squeeze()
+
+    if return_train and return_valid:
+        return train,valid
+    elif return_train:
+        return train
+    elif return_valid:
+        return valid
