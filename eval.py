@@ -16,7 +16,8 @@ from src.utils import (add_common_params,
                        setup_name_from_config, 
                        data_path_from_config,
                        gen_name_from_config,
-                       load_data_from_path)
+                       load_data_from_path,
+                       add_eval_params)
 
 lg = rdkit.RDLogger.logger()
 lg.setLevel(rdkit.RDLogger.CRITICAL)
@@ -32,6 +33,7 @@ def get_parser():
         modelPars = MODELS.get_model_train_parser(model)( subparsers.add_parser(model) )
         add_common_params(modelPars)
         add_sample_params(modelPars)
+        add_eval_params(modelPars)
 
     return parser
 
