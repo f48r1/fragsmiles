@@ -9,12 +9,14 @@ from moses.models_storage import ModelsStorage
 from src.word_rnn import WordRNN, WordRNNTrainer, word_rnn_parser
 
 import os
+import re
 from src.utils import (add_common_params, 
                        add_sample_params, 
                        root_path_from_config, 
                        setup_name_from_config, 
                        data_path_from_config,
-                       gen_path_from_config)
+                       gen_name_from_config,
+                       load_data_from_path)
 
 lg = rdkit.RDLogger.logger()
 lg.setLevel(rdkit.RDLogger.CRITICAL)
@@ -27,7 +29,7 @@ def get_parser():
     subparsers = parser.add_subparsers(
         title='Models eval script', description='available models', dest='model')
     for model in MODELS.get_model_names():
-        modelPars = subparsers.add_parser(model)
+        modelPars = MODELS.get_model_train_parser(model)( subparsers.add_parser(model) )
         add_common_params(modelPars)
         add_sample_params(modelPars)
 
@@ -45,26 +47,25 @@ def main(config, print_metrics=True):
     ROOT = root_path_from_config(config)
     SETUP = setup_name_from_config(config)
 
+    data_path = data_path_from_config(config)
+    if 'Aug' in data_path:
+        print('loading no augmented list of SMILES training set')
+        data_path = re.sub('aug[0-9]+','',data_path, flags=re.IGNORECASE)
 
-    data_strformat = data_path_from_config(config)
+    if config.dataset == 'moses':
+        train_data = load_data_from_path(data_path, notation='smiles', fold=config.fold, return_train=False)
+    else:
+        train_data = load_data_from_path(data_path, notation='smiles', fold=config.fold, return_valid=False)
 
-    test = pd.read_csv(data_strformat.format('test'), usecols = ["smiles"], compression="xz", 
-                        ).squeeze().values
-
-    train = pd.read_csv(data_strformat.format('train'), usecols = ["smiles"], compression="xz", 
-                        ).squeeze().values
-
-
-    gen_path = os.path.join(ROOT,SETUP, gen_path_from_config(config))
+    gen_path = os.path.join(ROOT,SETUP, gen_name_from_config(config))
 
     gen = pd.read_csv(gen_path+'.csv', usecols=["smiles"]).fillna("-").squeeze().values
 
-    
     metrics = get_all_metrics(gen=gen, k=config.ks, n_jobs=config.n_jobs,
                               device=config.device,
                               test_scaffolds=test_scaffolds,
                               ptest=ptest, ptest_scaffolds=ptest_scaffolds,
-                              test=test, train=train)
+                              test=train_data, train=train_data)
 
     table = pd.DataFrame([metrics]).T
     table.to_csv(gen_path+'_metrics.csv', header=False)

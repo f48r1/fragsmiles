@@ -90,17 +90,20 @@ def gen_name_from_config(config):
     return suffix + f'_generated{config.n_samples}' + ('novels' if config.onlyNovels else '') +\
           f'_{config.epoch}_T{config.temp}'
 
-def load_data_from_path(path, config, return_train=True, return_valid=True):
+def load_data_from_path(path, notation, fold, return_train=True, return_valid=True):
 
-    col_fold = f'fold{config.fold}'
+    col_fold = f'fold{fold}'
 
-    data = pd.read_csv(path, usecols = [config.notation,col_fold], 
+    data = pd.read_csv(path, usecols = [notation,col_fold], 
                         compression="xz" if 'tar.xz' in path else 'infer')
+    
+    if not return_train and not return_valid:
+        data[notation].squeeze()
 
-    if config.notation == 'fragsmiles' and config.aug > 1:
+    if notation == 'fragsmiles' and 'Aug' in path:
         data.dropna(axis=0, inplace=True)
     
-    if config.notation in ('fragsmiles','selfies'):
+    if notation in ('fragsmiles','selfies'):
         data = data.str.split(' ')
 
     groups = data.groupby(col_fold)

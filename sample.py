@@ -31,6 +31,8 @@ from src.conversion import (GenSmiles2Smiles,
                             GenFragSmiles2Smiles,
                             GentSmiles2Smiles)
 
+from src.utils import load_data_from_path
+
 lg = rdkit.RDLogger.logger()
 lg.setLevel(rdkit.RDLogger.CRITICAL)
 
@@ -81,13 +83,7 @@ def main(config):
         print('loading no augmented list of SMILES training set')
         data_path = re.sub('aug[0-9]+','',data_path, flags=re.IGNORECASE)
 
-    col_fold = f'fold{config.fold}'
-   
-    data = pd.read_csv(data_path, usecols = ['smiles',col_fold], 
-                    compression="xz" if 'tar.xz' in data_path else 'infer')
-
-    groups = data.groupby(col_fold)
-    smilesRef = groups.get_group('train').drop(columns=col_fold).squeeze()
+    smilesRef = load_data_from_path(data_path, notation='smiles', fold=config.fold, return_valid=False)
 
     samples = pd.DataFrame()
     smiles = pd.Series()

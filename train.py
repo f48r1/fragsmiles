@@ -66,7 +66,7 @@ def main(config):
 
     DATA_PATH = data_path_from_config(config)
 
-    train_data, valid_data = load_data_from_path(DATA_PATH, config)
+    train_data, valid_data = load_data_from_path(DATA_PATH, notation=config.notation, fold=config.fold)
   
     trainer = MODELS.get_model_trainer(config.model)(config)
 
