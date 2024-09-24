@@ -291,12 +291,41 @@ class Evaluator():
             self.samples = pd.concat([self.samples, df], ignore_index=True)
         
         return True
+
+    def load_novels(self):
+        if not self.csvNovels:
+            return False
     
     def getResultsGens(self):
         results = self.samples.copy()
 
         results[['valid','unique','novel']]=results['sampled'].apply(lambda x: x.getMetricsAsDF())
         # results.insert(loc=0, column='dataset', value=self.data_name)
+        setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
+        results = results.assign(dataset = self.data_name + f'_{self.datasetArgs["notation"]}-RNN', **setup)
+
+        results.drop(columns='sampled', inplace=True)
+        return results.sort_values(['amount','fold','epoch'])
+
+    def getResultsNovels(self):
+        
+        self.novelsMetrics=pd.DataFrame()
+        for novel in self.csvNovelsMetrics:
+            params=compileGen(novel)
+            setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
+            results = pd.read_csv(os.path.join(self.full_path, novel), index_col=0, header=None, names=[0]).T
+            results = results.assign(dataset = self.data_name + f'_{self.datasetArgs["notation"]}-RNN', **setup, **params)
+
+            self.novelsMetrics = pd.concat([ self.novelsMetrics, results,], ignore_index=True)
+        
+        dropCols = [column for column in self.novelsMetrics.columns if any( m in column.lower() for m in ['val','uniq','novel','testsf'] ) ]
+
+        return self.novelsMetrics.drop(columns=dropCols)
+
+    def getChiralResultsGens(self):
+        results = self.samples.copy()
+
+        results[['chirals','invalid','valid','unique','novel']]=results['sampled'].apply(lambda x: x.getChiralMetricsAsDF())
         setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
         results = results.assign(dataset = self.data_name + f'_{self.datasetArgs["notation"]}-RNN', **setup)
 
