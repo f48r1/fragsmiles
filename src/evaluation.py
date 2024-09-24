@@ -62,7 +62,7 @@ compilerPatterns=pd.DataFrame(
     [
     ['dataset', re.compile('^[a-z]+(?=_|Aug)'),str],
     ['aug', re.compile('(?<=Aug)\d+'),int],
-    ['notation', re.compile('[a-zA-Z]+(?=-RNN)'),str],
+    ['notation', re.compile('[a-zA-Z\-]+(?=-RNN)'),str],
     ['hl', re.compile('\d+(?=hl)'),int],
     ['hu', re.compile('\d+(?=hu)'),int],
     ['es', re.compile('\d+(?=es)'),int],
@@ -97,7 +97,7 @@ def compileForPatterns(strng, patterns):
     return dict_
 
 compileDataset = partial(compileForPatterns, patterns=argsDataset)
-compileParameter=partial(compileForPatterns, patterns=argsParameters)
+compileSetup=partial(compileForPatterns, patterns=argsParameters)
 compileLoss=partial(compileForPatterns, patterns=argsLoss)
 compileGen=partial(compileForPatterns, patterns=argsGen)
 
@@ -211,102 +211,122 @@ class SampledMoleculesFragSm(SampledMolecules):
 
 class Evaluator():
 
-    trainDFPerDataName={}
+    # train data of smiles notation. Only smiles beacause we just need it to compare and evaluate metrics
+    # first key : {dataset}{aug}
+    # second key : {fold}
 
-    def __init__(self, experiment_name, experiment_dir="experiments/", loadCSV=True, novel=False):
+    train_data={}
 
-        self._PATH=os.path.join(experiment_dir, experiment_name)
-        *_, dataName , paramName = os.path.split(experiment_name)
+    def __init__(self, experiment_name, experiment_dir="experiments/"):
 
-        self.files = files = list(os.listdir(self._PATH))
+        self.full_path=os.path.join(experiment_dir, experiment_name)
 
-        if not novel:
-            self.csvNames = [file for file in files if '.csv' in file and not 'metrics' in file and 'novels' not in file ]
-        else:
-            self.csvNames = [file for file in files if '.csv' in file and not 'metrics' in file and 'novels' in file ]
+        self.csvSamples = []
+        self.txtLogs = []
+        self.csvNovels = []
+        self.csvNovelsMetrics = []
 
-        self.logNames = [file for file in files if '.txt' in file and 'log' in file ]
-        self.metricNames = [file for file in files if '.csv' in file and 'metrics' in file and 'novels' in file ]
+        for file in os.listdir(self.full_path):
+            if 'log.txt' in file:
+                self.txtLogs.append(file)
+            elif 'metrics.csv' in file and 'novels' in file:
+                self.csvNovelsMetrics.append(file)
+            elif not 'descriptors.csv' in file and 'novels' in file:
+                self.csvNovels.append(file)
+            elif not 'novels' in file and not 'descriptors.csv' in file and 'generated' in file:
+                self.csvSamples.append(file)
 
-        self.dataInfo= dataInfo =compileDataset(dataName)
-        self.params= params =compileParameter(paramName)
+        splitted = os.path.normpath(self.full_path).split(os.sep)
+        *_, dataName, setupName = splitted
 
-        if dataInfo['notation'].lower() == 'fragsmiles':
+        self.datasetArgs= compileDataset(dataName)
+        self.setupArgs= compileSetup(setupName)
+
+        self.data_name = data_name = self.datasetArgs['dataset'] + ('Aug5' if self.datasetArgs['aug']==5 else '')
+
+        if not data_name in self.train_data:
+            data_path = os.path.join('data', data_name)
+            self.train_data[data_name] = {}
+            data_full = pd.read_csv(data_path + '.tar.xz', usecols=['smiles']+ [f'fold{fold}' for fold in range(5)], compression='xz' )
+            for fold in range(5):
+                query_str = f' fold{fold} == "train" '
+                self.train_data[data_name][fold]=data_full.query(query_str)[['smiles']]
+
+        self.samples = None
+        self.logs = None
+
+    def load_logs(self):
+        if not self.txtLogs:
+            return False
+        
+        self.logs=pd.DataFrame()
+        for log_name in self.txtLogs:
+            fold=compileLoss(log_name)['fold']
+
+            log=adjustDFloss( pd.read_csv(os.path.join(self.full_path, log_name)).assign(fold=fold) )
+            self.logs=pd.concat([ self.logs, log ], ignore_index=False)
+
+        return True
+    
+    def load_samples(self):
+
+        if not self.csvSamples:
+            return False
+
+        if self.datasetArgs['notation'].lower() == 'fragsmiles':
             class_=SampledMoleculesFragSm
         else:
             class_ = SampledMoleculesSm
 
-        self.gens =pd.DataFrame()
+        self.samples = pd.DataFrame()
 
-        for csvName in self.csvNames:
-            if not loadCSV:
-                break
-            setup=compileGen(csvName)
-            dataFile = f'{dataInfo["dataset"]}_train_{setup["fold"]}.tar.xz' if setup["fold"]!=None else f'{dataInfo["dataset"]}_train.tar.xz'
+        for samples_name in self.csvSamples:
+            params = compileGen(samples_name)
 
-            if not dataFile in self.trainDFPerDataName:
-                trainDF=pd.read_csv(os.path.join(experiment_dir,'data',dataFile), usecols = ["smiles"], compression="xz", )
-                if novel:
-                    trainDF['scaff']=trainDF['smiles'].apply(lambda x: MurckoScaffold.MurckoScaffoldSmiles(smiles=x, includeChirality=True) )
-                self.trainDFPerDataName[dataFile]=trainDF
+            smiles = pd.read_csv(os.path.join(self.full_path, samples_name))
+            sampled = class_(smiles, self.train_data[self.data_name][params['fold']])
 
-            df = pd.read_csv(os.path.join(self._PATH, csvName))
-            sampled = class_(df, self.trainDFPerDataName[dataFile])
+            df = pd.DataFrame([ { **params, 'sampled':sampled } ])
 
-            self.gens=pd.concat([
-            self.gens, pd.DataFrame([ {**dataInfo ,**params, **setup, 'sampled':sampled} ])
-            ], ignore_index=True)
+            self.samples = pd.concat([self.samples, df], ignore_index=True)
+        
+        return True
+    
+    def getResultsGens(self):
+        results = self.samples.copy()
 
-        self.logs=pd.DataFrame()
-        for logName in self.logNames:
-            fold=compileLoss(logName)['fold']
-            fold = int(fold) if fold else -1
+        results[['valid','unique','novel']]=results['sampled'].apply(lambda x: x.getMetricsAsDF())
+        # results.insert(loc=0, column='dataset', value=self.data_name)
+        setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
+        results = results.assign(dataset = self.data_name + f'_{self.datasetArgs["notation"]}-RNN', **setup)
 
-            log=adjustDFloss( pd.read_csv(os.path.join(self._PATH, logName)).assign(fold=fold) )
-            self.logs=pd.concat([ self.logs, log ], ignore_index=False)
+        results.drop(columns='sampled', inplace=True)
+        return results.sort_values(['amount','fold','epoch'])
 
+
+    def get_as_DFcell(self):
+        setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
+        df = pd.DataFrame( [{**setup, self.data_name + f'_{self.datasetArgs["notation"]}-RNN' : self}] )
+        # df.set_index(list(setup.keys()), inplace=True)
+        return df
+    
     def getTrainTestLosses(self):
         train = self.logs.query('mode=="Train" and fold!=""').groupby('epoch', as_index=True)['running_loss'].describe().loc[:,['mean','std']]
         test = self.logs.query('mode=="Eval" and fold!=""').groupby('epoch', as_index=True)['running_loss'].describe().loc[:,['mean','std']]
         return train, test
     
-    def getResultsGens(self):
-        results = self.gens.copy()
-
-        results[['valid','unique','novel']]=results['sampled'].apply(lambda x: x.getMetricsAsDF())
-
-        results.drop(columns='sampled', inplace=True)
-        return results.sort_values(['amount','fold','epoch'])
-
-    def getChiralResultsGens(self):
-        results = self.gens.copy()
-
-        results[['chirals','invalid','valid','unique','novel']]=results['sampled'].apply(lambda x: x.getChiralMetricsAsDF())
-
-        results.drop(columns='sampled', inplace=True)
-        return results.sort_values(['amount','fold','epoch'])
-
-    def getResultsNovels(self):
-        metrics=pd.DataFrame()
-        for novel in self.metricNames:
-            setup=compileGen(novel)
-            df = pd.read_csv(os.path.join(self._PATH, novel), index_col=0, header=None, names=[0]).T
-            df = pd.concat([ pd.DataFrame([ {**self.dataInfo ,**self.params, **setup} ]), df ], axis=1)
-
-            metrics = pd.concat([ metrics, df,], ignore_index=True)
+    def plot_logs(self, ax, **kwargs):
+        stdKwargs = dict(alpha=0.2, edgecolor='#1B2ACC', facecolor='#089FFF',
+                        linewidth=4, antialiased=True)
         
-        dropCols = [column for column in metrics.columns if any( m in column.lower() for m in ['val','uniq','novel','testsf'] ) ]
+        stdKwargs.update(kwargs)
+        train, test = self.getTrainTestLosses()
 
-        return metrics.drop(columns=dropCols)
+        for lossDF, label in zip( [train,test], ['train','valid'] ):
+            ax.plot(lossDF['mean'], label = label )
+            ax.fill_between(lossDF.index, lossDF['mean']-lossDF['std'], 
+                            lossDF['mean']+lossDF['std'], **stdKwargs)
+            
+        setup = [f'{k}={v}' for k,v in self.setupArgs.items() if k!='es']
 
-    def getScaffoldResults(self):
-        results = self.gens.copy()
-
-        results[['total','unique','novel','chiral']]=results['sampled'].apply(lambda x: x.getScafMetricsAsDF())
-
-        results.drop(columns='sampled', inplace=True)
-        return results.sort_values(['amount','fold','epoch'])
-
-    def __repr__(self) -> str:
-        return self._PATH
-        
+        ax.set_title(' '.join(setup))
