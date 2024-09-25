@@ -4,6 +4,7 @@ import torch
 import os
 import re
 from functools import partial
+from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
 
@@ -93,6 +94,8 @@ def compileForPatterns(strng, patterns):
         if value:
             fnc = compilerPatterns.loc[key,'type']
             value = fnc ( value.group() )
+        else:
+            value=1
         dict_[key]=value
     return dict_
 
@@ -104,20 +107,22 @@ compileGen=partial(compileForPatterns, patterns=argsGen)
 chiralCompiler = re.compile(r'(?<!@)@{1,2}(?!@)')
 
 class SampledMolecules:
-    def __init__(self, df, trainSm=None):
+    def __init__(self, df, ref_df=None, fold=0):
 
-        self.trainSm = trainSm
+        self.fold = fold
+        self.ref_df = ref_df
 
-        self.scaffolds=None
         self.sampled = df
         self._sm = sm = df["smiles"]
+        self.scaffolds = None
 
         self._maskValid = ~sm.isna()
         self._maskUnique = (self._maskValid & ~sm.duplicated(keep=False))
         self._maskNovel = None
 
-        if trainSm is not None:
-            self._maskNovel = (self._maskUnique & ~sm.isin(trainSm['smiles']))
+        train_smiles = self.ref_smiles
+        if train_smiles is not None:
+            self._maskNovel = (self._maskUnique & ~sm.isin(train_smiles))
 
     def smiles(self, mask = None):
         if mask:
@@ -125,6 +130,16 @@ class SampledMolecules:
             return self._sm[maskAttr]
 
         return self._sm
+
+    @property
+    def ref_smiles(self):
+        query = f'fold{self.fold} == "train"'
+        return self.ref_df.query(query)['smiles']
+    
+    @property
+    def ref_scaff(self):
+        query = f'fold{self.fold} == "train"'
+        return self.ref_df.query(query)['scaff']
 
     def getMetricsAsDF(self):
         return pd.Series([
@@ -135,11 +150,11 @@ class SampledMolecules:
     
     def _processScaffolds(self):
         sm = self.smiles('valid')
-        scaff = sm.apply(lambda x: MurckoScaffold.MurckoScaffoldSmiles(smiles=x, includeChirality=True) )
+        scaff = sm.apply(lambda x: MurckoScaffold.MurckoScaffoldSmiles(smiles=x, includeChirality=True) if Chem.MolFromSmiles(x) else '' )
         self.scaffolds = scaff = scaff.drop( scaff[scaff==""].index)
 
         self.uniqScaff=scaff.drop_duplicates()
-        self.novelScaff = self.uniqScaff[ ~self.uniqScaff.isin(self.trainSm['scaff'].values) ]
+        self.novelScaff = self.uniqScaff[ ~self.uniqScaff.isin(self.ref_scaff.values) ]
         self.chirScaff = self.novelScaff[ self.novelScaff.str.contains('@',regex=False) ]
 
     def getScafMetricsAsDF(self):
@@ -162,8 +177,8 @@ class SampledMolecules:
         return pd.Series([ total,unique,novel, chiral ])
 
 class SampledMoleculesSm(SampledMolecules):
-    def __init__(self, df, trainSm=None):
-        super().__init__(df, trainSm)
+    def __init__(self, df, ref_df=None, fold=0):
+        super().__init__(df, ref_df, fold)
 
         self.nStereoSampled = self.sampled.iloc[:,1].astype(str).apply( lambda x: len( chiralCompiler.findall(x)) )
         self.nStereoGen = self._sm.astype(str).apply(lambda x: len( chiralCompiler.findall(x) ) )
@@ -179,8 +194,8 @@ class SampledMoleculesSm(SampledMolecules):
         ])
 
 class SampledMoleculesFragSm(SampledMolecules):
-    def __init__(self, df, trainSm=None):
-        super().__init__(df, trainSm)
+    def __init__(self, df, ref_df=None, fold=0):
+        super().__init__(df, ref_df, fold)
 
         self._fSm = fSm = df.iloc[:,1:].apply(lambda x: cleanTokens( x.dropna() ), axis=1)
         # self._fSm_withBegin = df.apply(lambda x : cleanTokens(x.dropna(), ["<eos>","<pad>"]), axis=1)
@@ -217,9 +232,14 @@ class Evaluator():
 
     train_data={}
 
-    def __init__(self, experiment_name, experiment_dir="experiments/"):
+    def __init__(self, experiment_name, experiment_dir="experiments"):
 
-        self.full_path=os.path.join(experiment_dir, experiment_name)
+        splitted = os.path.normpath(experiment_name).split(os.sep)
+        *_, dataName, setupName = splitted
+        if experiment_dir in splitted:
+            self.full_path = experiment_name
+        else:
+            self.full_path=os.path.join(experiment_dir, experiment_name)
 
         self.csvSamples = []
         self.txtLogs = []
@@ -236,24 +256,20 @@ class Evaluator():
             elif not 'novels' in file and not 'descriptors.csv' in file and 'generated' in file:
                 self.csvSamples.append(file)
 
-        splitted = os.path.normpath(self.full_path).split(os.sep)
-        *_, dataName, setupName = splitted
 
         self.datasetArgs= compileDataset(dataName)
         self.setupArgs= compileSetup(setupName)
 
-        self.data_name = data_name = self.datasetArgs['dataset'] + ('Aug5' if self.datasetArgs['aug']==5 else '')
+        self.data_name = data_name = self.datasetArgs['dataset']# + ('Aug5' if self.datasetArgs['aug']==5 else '')
 
         if not data_name in self.train_data:
             data_path = os.path.join('data', data_name)
-            self.train_data[data_name] = {}
-            data_full = pd.read_csv(data_path + '.tar.xz', usecols=['smiles']+ [f'fold{fold}' for fold in range(5)], compression='xz' )
-            for fold in range(5):
-                query_str = f' fold{fold} == "train" '
-                self.train_data[data_name][fold]=data_full.query(query_str)[['smiles']]
+            data_full = pd.read_csv( data_path + '.tar.xz', usecols=['smiles'] + [f'fold{fold}' for fold in range(5)], compression='xz' )
+            self.train_data[data_name] = data_full
 
         self.samples = None
         self.logs = None
+        self.novels = None
 
     def load_logs(self):
         if not self.txtLogs:
@@ -284,7 +300,11 @@ class Evaluator():
             params = compileGen(samples_name)
 
             smiles = pd.read_csv(os.path.join(self.full_path, samples_name))
-            sampled = class_(smiles, self.train_data[self.data_name][params['fold']])
+            fold = params['fold']
+
+            ref_smiles = self.train_data[self.data_name]
+            
+            sampled = class_(smiles, ref_smiles, fold)
 
             df = pd.DataFrame([ { **params, 'sampled':sampled } ])
 
@@ -295,6 +315,36 @@ class Evaluator():
     def load_novels(self):
         if not self.csvNovels:
             return False
+
+        if self.datasetArgs['notation'].lower() == 'fragsmiles':
+            class_=SampledMoleculesFragSm
+        else:
+            class_ = SampledMoleculesSm
+        
+        self.novels = pd.DataFrame()
+
+        for novels_name in self.csvNovels:
+            params = compileGen(novels_name)
+
+            smiles = pd.read_csv(os.path.join(self.full_path, novels_name))
+            fold = params['fold']
+
+            ref_smiles = self.train_data[self.data_name]
+            
+            sampled = class_(smiles, ref_smiles, fold)
+
+            df = pd.DataFrame([ { **params, 'sampled':sampled } ])
+
+            self.novels = pd.concat([self.novels, df], ignore_index=True)
+
+        return True
+        
+    def load_scaffolds(self):
+        pointer_data = self.train_data[self.data_name]
+        if not 'scaff' in pointer_data.columns:
+            pointer_data['scaff']=pointer_data['smiles'].apply(lambda x: MurckoScaffold.MurckoScaffoldSmiles(smiles=x, includeChirality=True) )
+
+        return True
     
     def getResultsGens(self):
         results = self.samples.copy()
@@ -302,7 +352,7 @@ class Evaluator():
         results[['valid','unique','novel']]=results['sampled'].apply(lambda x: x.getMetricsAsDF())
         # results.insert(loc=0, column='dataset', value=self.data_name)
         setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
-        results = results.assign(dataset = self.data_name + f'_{self.datasetArgs["notation"]}-RNN', **setup)
+        results = results.assign(**self.datasetArgs, **setup)
 
         results.drop(columns='sampled', inplace=True)
         return results.sort_values(['amount','fold','epoch'])
@@ -314,7 +364,7 @@ class Evaluator():
             params=compileGen(novel)
             setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
             results = pd.read_csv(os.path.join(self.full_path, novel), index_col=0, header=None, names=[0]).T
-            results = results.assign(dataset = self.data_name + f'_{self.datasetArgs["notation"]}-RNN', **setup, **params)
+            results = results.assign(**self.datasetArgs, **setup, **params)
 
             self.novelsMetrics = pd.concat([ self.novelsMetrics, results,], ignore_index=True)
         
@@ -327,15 +377,24 @@ class Evaluator():
 
         results[['chirals','invalid','valid','unique','novel']]=results['sampled'].apply(lambda x: x.getChiralMetricsAsDF())
         setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
-        results = results.assign(dataset = self.data_name + f'_{self.datasetArgs["notation"]}-RNN', **setup)
+        results = results.assign(**self.datasetArgs, **setup)
+
+        results.drop(columns='sampled', inplace=True)
+        return results.sort_values(['amount','fold','epoch'])
+    
+    def getScaffoldResults(self):
+        results = self.novels.copy()
+
+        results[['total','unique','novel','chiral']]=results['sampled'].apply(lambda x: x.getScafMetricsAsDF())
+        setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
+        results = results.assign(**self.datasetArgs, **setup)
 
         results.drop(columns='sampled', inplace=True)
         return results.sort_values(['amount','fold','epoch'])
 
-
     def get_as_DFcell(self):
         setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
-        df = pd.DataFrame( [{**setup, self.data_name + f'_{self.datasetArgs["notation"]}-RNN' : self}] )
+        df = pd.DataFrame( [{**setup, **self.datasetArgs, self.datasetArgs["notation"] : self}] )
         # df.set_index(list(setup.keys()), inplace=True)
         return df
     
