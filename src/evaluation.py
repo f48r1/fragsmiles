@@ -355,11 +355,22 @@ class Evaluator():
             return False
         
         self.descriptors=pd.DataFrame()
-        for descriptors_name in self.csvNovelsDescriptors:
-            fold=compileLoss(descriptors_name)['fold']
+        for descriptors_file in self.csvNovelsDescriptors:
+            fold=compileLoss(descriptors_file)['fold']
 
-            descriptors=pd.read_csv(os.path.join(self.full_path, descriptors_name)).assign(fold=fold)
+            descriptors=pd.read_csv(os.path.join(self.full_path, descriptors_file)).assign(fold=fold)
             self.descriptors=pd.concat([ self.descriptors, descriptors ], ignore_index=False)
+
+        pointer_data = self.train_data[self.data_name]
+        descriptors_names=self.descriptors.columns.drop('fold').tolist()
+        if not all(desc in pointer_data.columns.tolist() for desc in descriptors_names ):
+            data_path = os.path.join('data', self.data_name)
+            descriptors_full = pd.read_csv( data_path + '_descriptors.tar.xz', compression='xz' )
+            for descriptors_name in descriptors_names:
+                if descriptors_name in pointer_data.columns.to_list():
+                    continue
+                
+                pointer_data[descriptors_name] = descriptors_full[descriptors_name]
 
         return True
 
