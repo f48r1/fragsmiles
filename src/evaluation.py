@@ -245,6 +245,7 @@ class Evaluator():
         self.txtLogs = []
         self.csvNovels = []
         self.csvNovelsMetrics = []
+        self.csvNovelsDescriptors = []
 
         for file in os.listdir(self.full_path):
             if 'log.txt' in file:
@@ -255,6 +256,8 @@ class Evaluator():
                 self.csvNovels.append(file)
             elif not 'novels' in file and not 'descriptors.csv' in file and 'generated' in file:
                 self.csvSamples.append(file)
+            elif 'novels' in file and 'descriptors.csv' in file:
+                self.csvNovelsDescriptors.append(file)
 
 
         self.datasetArgs= compileDataset(dataName)
@@ -270,6 +273,7 @@ class Evaluator():
         self.samples = None
         self.logs = None
         self.novels = None
+        self.descriptors = None
 
     def load_logs(self):
         if not self.txtLogs:
@@ -346,6 +350,19 @@ class Evaluator():
 
         return True
     
+    def load_descriptors(self):
+        if not self.csvNovelsDescriptors:
+            return False
+        
+        self.descriptors=pd.DataFrame()
+        for descriptors_name in self.csvNovelsDescriptors:
+            fold=compileLoss(descriptors_name)['fold']
+
+            descriptors=pd.read_csv(os.path.join(self.full_path, descriptors_name)).assign(fold=fold)
+            self.descriptors=pd.concat([ self.descriptors, descriptors ], ignore_index=False)
+
+        return True
+
     def getResultsGens(self):
         results = self.samples.copy()
 

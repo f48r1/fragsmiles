@@ -24,7 +24,7 @@ def GenSmiles2Smiles(x):
 def GenSelfies2Smiles(x):
     try:
         sm = sf.decoder(*x)
-        return Chem.CanonSmiles(sm)
+        return GenSmiles2Smiles([sm])
     except:
         return None
 
@@ -50,4 +50,4 @@ asm_alg = 'CALG_TSDY'
 from tsmiles.DataSet.Graph.CNJMolAssembler import CNJMolAssembler
 def GentSmiles2Smiles(x):
     re_smils, bfs_ex_smiles_sub, new_vocs_sub = CNJMolAssembler.decode_single(*x, _ctoken , asm_alg, n_samples = 1, p_mean = None)
-    return re_smils
+    return GenSmiles2Smiles[re_smils]
