@@ -1,0 +1,7 @@
+,total,unique,novel,chiral,unique%,novel%,chiral%,inducedNewFrags,inducedNewFrags%
+SMILESx1,False,False,True,True,False,True,False,True,True
+SELFIESx1,True,True,True,False,True,True,True,True,True
+t-SMILESx1,True,True,True,False,True,True,False,True,True
+SMILESx5,False,False,True,False,False,True,False,True,True
+SELFIESx5,False,True,True,False,True,True,True,True,True
+t-SMILESx5,True,True,True,False,False,True,False,True,True

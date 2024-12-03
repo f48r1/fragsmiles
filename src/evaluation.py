@@ -7,7 +7,7 @@ from functools import partial
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
-
+notations = ['fragSMILES','t-SMILES','SELFIES','SMILES']
 
 ## Given from stackoverflow :)
 def round_sig_figs(val, val_err, sig_figs=2):
@@ -32,14 +32,30 @@ def ConcatMeanStd(row):
     mean, std = row
     mean, std = round_sig_figs(mean, std, 1)
 
+    if mean.is_integer() and std.is_integer():
+        mean = int(mean)
+        std = int(std)
+
     strng = f'{mean} ± {std}'
     return strng
 
-def ResultsFromMeanStdDF(df):
-    names = df.columns.get_level_values(0)
+def ResultsFromMeanStdDF(df, significantdf=None):
+    names = [column for column in df.columns.get_level_values(0) if not '%' in column] 
     newdf = pd.DataFrame(index=df.index)
     for name in names:
         newdf[name]=df[name].apply(ConcatMeanStd, axis=1)
+        if significantdf is not None:
+            for notation in notations:
+                if notation!='fragSMILES' and significantdf.loc[notation,name]:
+                    newdf.xs(notation)[name] += '*'
+
+        if name+'%' in df.columns.get_level_values(0):
+            perc = df[(name+'%','mean')] * 100
+            newdf[name] += perc.apply(round).apply(lambda x: f"\n({x}%)")
+            if significantdf is not None:
+                for notation in notations:
+                    if notation!='fragSMILES' and significantdf.loc[notation,name+'%']:
+                        newdf.xs(notation)[name] += '*'
     
     return newdf
 

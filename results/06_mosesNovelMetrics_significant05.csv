@@ -1,0 +1,4 @@
+,FCD/Test,SNN/Test,Scaf/Test,IntDiv,IntDiv2,Filters,logP,SA,QED,weight
+SMILES,True,True,False,False,False,True,True,False,False,False
+SELFIES,True,True,False,True,True,True,True,True,True,False
+t-SMILES,True,True,True,True,True,True,False,True,True,True

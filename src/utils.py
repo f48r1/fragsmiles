@@ -21,7 +21,7 @@ def add_common_params(parser):
                         type=int, default=0,
                         help="Molecular representation employed to feed model")
     parser.add_argument("--dataset", required=False,
-                        type=str, default='grisoni',
+                        type=str, default='chembl',
                         help="Molecular representation employed to feed model")
     parser.add_argument("--aug", required=False,
                         type=int, default=1,
@@ -88,14 +88,14 @@ def gen_name_from_config(config):
           f'_{config.epoch}_T{config.temp}'
 
 def load_data_from_path(path, notation, fold, return_train=True, return_valid=True):
+    
+    if (not return_train and not return_valid) or fold in [None, False]:
+        return pd.read_csv(path, usecols = [notation], compression="xz" if 'tar.xz' in path else 'infer').squeeze()
 
     col_fold = f'fold{fold}'
 
     data = pd.read_csv(path, usecols = [notation,col_fold], 
                         compression="xz" if 'tar.xz' in path else 'infer')
-    
-    if not return_train and not return_valid:
-        return data[notation].squeeze()
 
     if notation == 'fragsmiles' and 'Aug' in path:
         data.dropna(axis=0, inplace=True)

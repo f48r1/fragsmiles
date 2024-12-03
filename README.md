@@ -25,6 +25,10 @@ pip install -r requirements.txt
 
 The [experiments/scripts](experiments/scripts) folder has been adapted from the MOSES benchmarking framework to accommodate various chemical notations used in our study for training, sampling and evaluation phases. Given that fragSMILES is a *chemical-word-level notation*, modifications were made to the char-RNN model architecture originally provided by [MOSES](https://github.com/molecularsets/moses), resulting in a tailored word-RNN model architecture, found in ([experiments/scripts/word_rnn](experiments/scripts/word_rnn)).
 
+
+## Work in progress ... 
+
+<!-- 
 ## Training phase
 
 RNN models were trained for each notation (SMILES, SELFIES, fragSMILES) and each hyperparameter setting. In the experiments/ folder, you will find the `train_single_model.sh`, `sample_single_model.sh`, and `eval_single_model.sh` bash script files. These can be used to initiate the training, sampling, or evaluation phases for a single model. The files provide key arguments to specify the chemical notation, hyperparameters, and other parameters. The script files must be run from the same directory ([experiments/](experiments/)). Additionally, if you are using a **conda or pure Python environment, it needs to be activated within the script**.
@@ -77,4 +81,4 @@ See above, same of metricMoses notebook but on [Grisoni et al](https://github.co
 
 ## 8_scaffoldGrisoni
 
-A scaffold analysis was made on generated set of novel molecules by RNN models trained on Grisoni Dataset. Functions for this purpose were imported from [evaluation.py](evaluation.py) file.
+A scaffold analysis was made on generated set of novel molecules by RNN models trained on Grisoni Dataset. Functions for this purpose were imported from [evaluation.py](evaluation.py) file. -->

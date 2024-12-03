@@ -1,0 +1,7 @@
+,chirals,invalid,valid,unique,novel,invalid%,valid%,unique%,novel%
+SELFIESx1,False,True,True,True,True,True,True,True,True
+SMILESx1,False,True,False,False,True,True,True,False,False
+t-SMILESx1,False,True,True,True,True,True,True,True,True
+SELFIESx5,False,True,True,True,True,True,True,True,True
+SMILESx5,False,False,False,False,False,True,True,True,True
+t-SMILESx5,False,True,True,True,True,True,True,True,True

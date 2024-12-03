@@ -6,7 +6,6 @@ import selfies as sf
 ### Caution HERE : name of package imported can change...
 from chemicalgof import Smiles2GoF, GoF2Tokens, GoF2MoreTokens, CanonicalGoF2Tokens
 
-from multiprocesspandas import applyparallel
 import multiprocessing
 
 import networkx as nx
@@ -36,7 +35,7 @@ def apply_on_list(lst, fnc):
             ret.append(x)
     return ret
 
-def applyFncPool(column, fnc, CPUs=10):
+def applyFncPool(column, fnc, CPUs=cpu_count()):
     with multiprocessing.Pool(processes=CPUs) as pool:
         column = pool.map(fnc, column)
 
@@ -101,7 +100,7 @@ def fragmentSmiles(sm, aug=1, fncDecompose=Smiles2GoF, sep=" ", default=DEFAULT)
     diG=fncDecompose(sm)
     # [x] feature added : recognize if there are cyclic pieces of graph
     if diG is None:
-        return default
+        out=default
     elif list(nx.simple_cycles(diG.to_undirected())):
         out=default
     elif aug>1:

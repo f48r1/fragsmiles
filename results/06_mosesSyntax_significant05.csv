@@ -1,0 +1,4 @@
+,valid,unique,novel,valid%,unique%,novel%
+SMILES,True,True,True,False,True,True
+SELFIES,True,True,True,True,True,True
+t-SMILES,True,True,True,True,True,True
