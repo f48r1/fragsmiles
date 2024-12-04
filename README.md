@@ -72,7 +72,7 @@ Counts of unique tokens provided by files [data/01_zincToks.csv](data/01_zincTok
 
 Whole molecules dataset provided by [MOSES](https://github.com/molecularsets/moses) benchmarking framework was decomposed into fragSMILES notation. Functions employed for this purpose were imported from [processer.py](src/processer.py) (multiprocessing was adopted to accelerate decomposition). The molecule dataset represented as SMILES, SELFIES, t-SMILES and fragSMILES was split into train and test sets using a 5-fold cross-validation scheme. These datasets were then stored in the [data/](data/).
 
-## 5_fragGrisoni
+## 5_fragChembl
 
 Whole molecules dataset provided by [Grisoni et al](https://github.com/ETHmodlab/BIMODAL) work was first cured and then decomposed into fragSMILES notation. Functions employed for this purpose were imported from [processer.py](src.processer.py) (multiprocessing was adopted to accelerate decomposition). Molecules represented by a number of tokens in range 10-32 were retained. Then, resulting molecules represented as SMILES, SELFIES, t-SMILES and fragSMILES were augmented till 5 representations. Finally, 2 resulting dataset were split into train and test sets using a 5-fold cross-validation scheme. These datasets were then stored in [data/](data/).
 
