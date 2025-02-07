@@ -10,7 +10,7 @@ Here, notebook files are explained about their aim sorted by steps of workflow (
 
 ## Requirements
 
-The entire workflow is based on Python language. Neural network training was made possible by Pytorch package. However, requirements are provided in [requirements.txt](requirements.txt). Essential Python repositories include [chemicalgof](https://github.com/f48r1/chemicalgof) for molecular decomposition of each dataset and [MOSES](https://github.com/molecularsets/moses) for RNN model architecture and metric evaluations. **Ensure these repositories are installed before cloning this repository**:
+The entire workflow is based on Python language. Neural network training was made possible by Pytorch package. However, requirements are provided in [requirements.txt](requirements.txt). Essential Python repositories include [chemicalgof](https://github.com/f48r1/chemicalgof) for molecular decomposition of each dataset, [MOSES](https://github.com/molecularsets/moses) for RNN model architecture and metric evaluations, and [t-SMILES](https://github.com/juanniwu/t-SMILES) reporitory to handle mentioned chemical notation. **Ensure these repositories are installed before cloning this repository**:
 
 ```shell
 git clone https://github.com/f48r1/fragsmiles.git

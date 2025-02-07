@@ -1,5 +1,5 @@
 from rdkit import Chem
-from chemicalgof import Sequence2Smiles
+from chemicalgof import Sequence2Smiles, String2Tokens
 import pandas as pd
 import numpy as np
 import selfies as sf
@@ -32,6 +32,16 @@ def GenFragSmiles2Smiles(x:pd.Series) -> str:
     lst=x.dropna()
     lst=cleanTokens(lst)
     return Sequence2Smiles(lst)
+
+def GenAtomFragSmiles2Smiles(x):
+    try:
+        T = String2Tokens(*x)
+        diG = T.getGraph()
+        mol = diG.getMol()
+        x = Chem.MolToSmiles(mol)
+        return x
+    except:
+        return None
 
 from tsmiles.DataSet.STDTokens import CTokens, STDTokens_Frag_File
 from tsmiles.MolUtils.RDKUtils.Frag.RDKFragUtil import Fragment_Alg

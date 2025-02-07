@@ -45,7 +45,6 @@ def main(config, print_metrics=True):
     ptest_scaffolds = None
     train = None
 
-
     ROOT = root_path_from_config(config)
     SETUP = setup_name_from_config(config)
 

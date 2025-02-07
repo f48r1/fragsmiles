@@ -29,7 +29,8 @@ from src.word_rnn import WordRNN, WordRNNTrainer, word_rnn_parser
 from src.conversion import (GenSmiles2Smiles,
                             GenSelfies2Smiles,
                             GenFragSmiles2Smiles,
-                            GentSmiles2Smiles)
+                            GentSmiles2Smiles,
+                            GenAtomFragSmiles2Smiles)
 
 from src.utils import load_data_from_path
 
@@ -102,6 +103,8 @@ def main(config):
                 current_smiles = current_samples.apply(GenSelfies2Smiles, axis=1)
             elif config.notation == 'tsmiles':
                 current_smiles = current_samples.apply(GentSmiles2Smiles, axis=1)
+            elif config.notation == 'atom_fragsmiles':
+                current_smiles = current_samples.apply(GenAtomFragSmiles2Smiles, axis=1)
 
             if config.onlyNovels:
                 maskDupl = current_smiles.duplicated()

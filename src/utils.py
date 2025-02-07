@@ -6,7 +6,7 @@ def add_common_params(parser):
     add_common_arg(parser)
 
     parser.add_argument('--save_frequency',
-                        type=int, default=1,
+                        type=int, default=1, required=False,
                         help='How often to save the model')
     parser.add_argument('--dir_experiments',
                         type=str, required=False, default='experiments/',
@@ -67,6 +67,8 @@ def root_path_from_config(config):
         'smiles':'SMILES',
         'selfies':'SELFIES',
         'tsmiles':'t-SMILES',
+        # XXX fragsmiles atom-tokenized
+        'atom_fragsmiles':'atom-fragSMILES',
     }
 
     return os.path.join(
@@ -89,7 +91,7 @@ def gen_name_from_config(config):
 
 def load_data_from_path(path, notation, fold, return_train=True, return_valid=True):
     
-    if (not return_train and not return_valid) or fold in [None, False]:
+    if not return_valid or (fold is False and fold!=0) or fold is None:
         return pd.read_csv(path, usecols = [notation], compression="xz" if 'tar.xz' in path else 'infer').squeeze()
 
     col_fold = f'fold{fold}'
@@ -97,11 +99,12 @@ def load_data_from_path(path, notation, fold, return_train=True, return_valid=Tr
     data = pd.read_csv(path, usecols = [notation,col_fold], 
                         compression="xz" if 'tar.xz' in path else 'infer')
 
-    if notation == 'fragsmiles' and 'Aug' in path:
+    if (notation == 'fragsmiles' or notation == 'atom_fragsmiles') and 'Aug' in path:
         data.dropna(axis=0, inplace=True)
     
-    if notation in ('fragsmiles','selfies'):
-        data = data.str.split(' ')
+    # XXX atom-tokenized fragSMILES
+    if notation in ('fragsmiles','selfies', 'atom_fragsmiles'):
+        data[notation] = data[notation].str.split(' ')
 
     groups = data.groupby(col_fold)
 

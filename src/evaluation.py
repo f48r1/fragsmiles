@@ -4,10 +4,25 @@ import torch
 import os
 import re
 from functools import partial
+from itertools import chain
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
 notations = ['fragSMILES','t-SMILES','SELFIES','SMILES']
+
+from chemicalgof.decompositer import SINGLEXOCYCLICPATT
+def get_rings(mol):
+    bondMatches = mol.GetSubstructMatches( Chem.MolFromSmarts(SINGLEXOCYCLICPATT) )
+    bonds=[mol.GetBondBetweenAtoms(*b).GetIdx() for b in bondMatches]
+    if not bonds:
+        if mol.HasSubstructMatch(Chem.MolFromSmarts('[R]')):
+            return (Chem.MolToSmiles(mol),)
+        return tuple()
+    frags = Chem.FragmentOnBonds(mol, addDummies=False, bondIndices=bonds, )
+    fragsMol=Chem.GetMolFrags(frags,asMols=True)
+    cycles = [ frag for frag in fragsMol if frag.HasSubstructMatch(Chem.MolFromSmarts('[R]'))]
+    cycles_smi = [Chem.MolToSmiles(mol) for mol in cycles ]
+    return tuple(cycles_smi)
 
 ## Given from stackoverflow :)
 def round_sig_figs(val, val_err, sig_figs=2):
@@ -131,6 +146,7 @@ class SampledMolecules:
         self.sampled = df
         self._sm = sm = df["smiles"]
         self.scaffolds = None
+        self.rings = None
 
         self._maskValid = ~sm.isna()
         self._maskUnique = (self._maskValid & ~sm.duplicated(keep=False))
@@ -156,6 +172,11 @@ class SampledMolecules:
     def ref_scaff(self):
         query = f'fold{self.fold} == "train"'
         return self.ref_df.query(query)['scaff']
+    
+    @property
+    def ref_rings(self):
+        query = f'fold{self.fold} == "train"'
+        return self.ref_df.query(query)['rings']
 
     def getMetricsAsDF(self):
         return pd.Series([
@@ -173,6 +194,18 @@ class SampledMolecules:
         self.novelScaff = self.uniqScaff[ ~self.uniqScaff.isin(self.ref_scaff.values) ]
         self.chirScaff = self.novelScaff[ self.novelScaff.str.contains('@',regex=False) ]
 
+    def _processRings(self):
+        sm = self.smiles('valid')
+        rings = sm.apply( lambda x: get_rings(Chem.MolFromSmiles(x)) ).dropna()
+        self.rings = rings = pd.Series(chain(*rings.tolist()))
+
+        train_rings=self.ref_rings.squeeze().str.split(' ').dropna()
+        train_rings = set(chain(*train_rings.tolist()))
+
+        self.uniqRings = rings.drop_duplicates()
+        self.novelRings = self.uniqRings[ ~self.uniqRings.isin(train_rings) ]
+        self.chirRings = self.novelRings[ self.novelRings.str.contains('@',regex=False) ]
+        
     def getScafMetricsAsDF(self):
         if self.scaffolds is None:
             try :
@@ -185,13 +218,28 @@ class SampledMolecules:
         unique=len(self.uniqScaff)
         novel=len(self.novelScaff)
 
-        # da cancellare da qua poi !!
-        self.chirScaff = self.novelScaff[ self.novelScaff.str.contains('@',regex=False) ]
         chiral=len(self.chirScaff)
 
         # return {"total":total, "unique":unique,"novel":novel}
         return pd.Series([ total,unique,novel, chiral ])
+    
+    def getRingsMetricsAsDF(self):
+        if self.rings is None:
+            try :
+                self._processRings()
+            except Exception as e:
+                print(self, e)
+                return pd.Series([0,0,0])
 
+        total = len(self.rings)
+        unique=len(self.uniqRings)
+        novel=len(self.novelRings)
+
+        chiral=len(self.chirRings)
+
+        return pd.Series([ total,unique,novel, chiral ])
+
+## Variants for Sampled are beacause of chiral metrics
 class SampledMoleculesSm(SampledMolecules):
     def __init__(self, df, ref_df=None, fold=0):
         super().__init__(df, ref_df, fold)
@@ -361,8 +409,11 @@ class Evaluator():
         
     def load_scaffolds(self):
         pointer_data = self.train_data[self.data_name]
-        if not 'scaff' in pointer_data.columns:
-            pointer_data['scaff']=pointer_data['smiles'].apply(lambda x: MurckoScaffold.MurckoScaffoldSmiles(smiles=x, includeChirality=True) )
+        if not 'scaff' in pointer_data.columns or not 'rings' in pointer_data.columns:
+            data_path = os.path.join('data', self.data_name)
+            train_scaff = pd.read_csv( data_path + '_scaffolds_rings.tar.xz', usecols=['scaffold','rings'], compression='xz' )
+            pointer_data['scaff']=train_scaff['scaffold']
+            pointer_data['rings']=train_scaff['rings']
 
         return True
     
@@ -402,7 +453,6 @@ class Evaluator():
         return results.sort_values(['amount','fold','epoch'])
 
     def getResultsNovels(self):
-        
         self.novelsMetrics=pd.DataFrame()
         for novel in self.csvNovelsMetrics:
             params=compileGen(novel)
@@ -430,6 +480,16 @@ class Evaluator():
         results = self.novels.copy()
 
         results[['total','unique','novel','chiral']]=results['sampled'].apply(lambda x: x.getScafMetricsAsDF())
+        setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
+        results = results.assign(**self.datasetArgs, **setup)
+
+        results.drop(columns='sampled', inplace=True)
+        return results.sort_values(['amount','fold','epoch'])
+    
+    def getRingsResults(self):
+        results = self.novels.copy()
+
+        results[['total','unique','novel','chiral']]=results['sampled'].apply(lambda x: x.getRingsMetricsAsDF())
         setup = {k:v for k,v in self.setupArgs.items() if k!='es'}
         results = results.assign(**self.datasetArgs, **setup)
 
